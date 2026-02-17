@@ -146,7 +146,7 @@ int32_t UpDownInterruptBase::runOnce()
         this->action = UPDOWN_ACTION_NONE;
     }
 
-    return 20; // This will control how the input frequency
+    return INT32_MAX; // This will control how the input frequency
 }
 
 void UpDownInterruptBase::intPressHandler()

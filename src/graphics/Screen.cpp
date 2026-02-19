@@ -65,6 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "modules/WaypointModule.h"
 #include "sleep.h"
 #include "target_specific.h"
+
+#ifdef OLED_PL
+#include "fonts/OLEDDisplayFontsPL.h"
+#endif
+
 extern MessageStore messageStore;
 
 #if USE_TFTDISPLAY

@@ -1355,7 +1355,7 @@ void UIRenderer::drawOEMIconScreen(const char *upperMsg, OLEDDisplay *display, O
 
     display->setTextAlignment(TEXT_ALIGN_LEFT);
     const char *title = USERPREFS_OEM_TEXT;
-    if (currentResolution == ScreenResolution::High) {
+    if (currentResolution >= ScreenResolution::Low) {
         display->drawString(x + getStringCenteredX(title), y + SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM, title);
     }
     display->setFont(FONT_SMALL);

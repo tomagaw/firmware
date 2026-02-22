@@ -55,9 +55,11 @@ class menuHandler
         NodeNameLengthMenu,
         FrameToggles,
         DisplayUnits,
-        MessageBubblesMenu
+        MessageBubblesMenu,
+        TimeoutPicker
     };
     static screenMenus menuQueue;
+    static screenMenus previousMenu;
     static uint32_t pickedNodeNum; // node selected by NodePicker for ManageNodeMenu
 
     static void OnboardMessage();
@@ -111,6 +113,7 @@ class menuHandler
     static void displayUnitsMenu();
     static void messageBubblesMenu();
     static void textMessageMenu();
+    static void timeoutPicker();
 
   private:
     static void saveUIConfig();

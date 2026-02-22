@@ -59,6 +59,10 @@ BannerOverlayOptions createStaticBannerOptions(const char *message, const MenuOp
 } // namespace
 
 menuHandler::screenMenus menuHandler::menuQueue = MenuNone;
+/* Stores previous value of menuQueue
+ * Note: Use only for "Back" from last menu in a menu stack (e.g. RebootMenu)
+ */
+menuHandler::screenMenus menuHandler::previousMenu = MenuNone;
 uint32_t menuHandler::pickedNodeNum = 0;
 bool test_enabled = false;
 uint8_t test_count = 0;
@@ -2139,7 +2143,7 @@ void menuHandler::rebootMenu()
             messageStore.saveToFlash();
             rebootAtMsec = millis() + DEFAULT_REBOOT_SECONDS * 1000;
         } else {
-            menuQueue = PowerMenu;
+            menuQueue = previousMenu; // Return to previous menu instead of a fixed menu
             screen->runNow();
         }
     };
@@ -2301,9 +2305,9 @@ void menuHandler::screenOptionsMenu()
     bool hasSupportBrightness = false;
 #endif
 
-    enum optionsNumbers { Back, Brightness, ScreenColor, FrameToggles, DisplayUnits, MessageBubbles };
-    static const char *optionsArray[6] = {"Back"};
-    static int optionsEnumArray[6] = {Back};
+    enum optionsNumbers { Back, Brightness, Timeout, ScreenColor, FrameToggles, DisplayUnits, MessageBubbles };
+    static const char *optionsArray[7] = {"Back"};
+    static int optionsEnumArray[7] = {Back};
     int options = 1;
 
     // Only show brightness for B&W displays
@@ -2311,6 +2315,9 @@ void menuHandler::screenOptionsMenu()
         optionsArray[options] = "Brightness";
         optionsEnumArray[options++] = Brightness;
     }
+
+    optionsArray[options] = "Timeout";
+    optionsEnumArray[options++] = Timeout;
 
     // Only show screen color for TFT displays
 #if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
@@ -2336,6 +2343,9 @@ void menuHandler::screenOptionsMenu()
     bannerOptions.bannerCallback = [](int selected) -> void {
         if (selected == Brightness) {
             menuHandler::menuQueue = menuHandler::BrightnessPicker;
+            screen->runNow();
+        } else if (selected == Timeout) {
+            menuHandler::menuQueue = menuHandler::TimeoutPicker;
             screen->runNow();
         } else if (selected == ScreenColor) {
             menuHandler::menuQueue = menuHandler::TftColorMenuPicker;
@@ -2632,10 +2642,88 @@ void menuHandler::messageBubblesMenu()
     screen->showOverlayBanner(bannerOptions);
 }
 
+void menuHandler::timeoutPicker()
+{
+    // Same values as Meshtastic App for consistency
+    static const char *optionsArray[] = {"Back",       "15 seconds", "30 seconds", "1 minute", "5 minutes",
+                                         "10 minutes", "15 minutes", "30 minutes", "1 hour",   "Always On"};
+
+    // Get current timeout to set initial selection
+    int8_t initialSelection = 1; // Default to 15 seconds
+    if (config.display.screen_on_secs >= INT32_MAX) {
+        initialSelection = 9; // Always On
+    } else if (config.display.screen_on_secs >= 60 * 60) {
+        initialSelection = 8; // 1 hour
+    } else if (config.display.screen_on_secs >= 30 * 60) {
+        initialSelection = 7; // 30 minutes
+    } else if (config.display.screen_on_secs >= 15 * 60) {
+        initialSelection = 6; // 15 minutes
+    } else if (config.display.screen_on_secs >= 10 * 60) {
+        initialSelection = 5; // 10 minutes
+    } else if (config.display.screen_on_secs >= 5 * 60) {
+        initialSelection = 4; // 5 minutes
+    } else if (config.display.screen_on_secs >= 60) {
+        initialSelection = 3; // 1 minute
+    } else if (config.display.screen_on_secs >= 30) {
+        initialSelection = 2; // 30 seconds
+    } else if (config.display.screen_on_secs >= 15) {
+        initialSelection = 1; // 15 seconds
+    }
+
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Display Timeout";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Timeout";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = 10;
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == 1) { // 15 seconds
+            config.display.screen_on_secs = 15;
+        } else if (selected == 2) { // 30 seconds
+            config.display.screen_on_secs = 30;
+        } else if (selected == 3) { // 1 minute
+            config.display.screen_on_secs = 60;
+        } else if (selected == 4) { // 5 minutes
+            config.display.screen_on_secs = 5 * 60;
+        } else if (selected == 5) { // 10 minutes
+            config.display.screen_on_secs = 10 * 60;
+        } else if (selected == 6) { // 15 minutes
+            config.display.screen_on_secs = 15 * 60;
+        } else if (selected == 7) { // 30 minutes
+            config.display.screen_on_secs = 30 * 60;
+        } else if (selected == 8) { // 1 hour
+            config.display.screen_on_secs = 60 * 60;
+        } else if (selected == 9) { // Always On
+            config.display.screen_on_secs = INT32_MAX;
+        } else { // Back
+            menuQueue = ScreenOptionsMenu;
+            screen->runNow();
+        }
+
+        if (selected != 0) { // Not "Back"
+            LOG_INFO("Display timeout set to %d seconds", config.display.screen_on_secs);
+            saveUIConfig();
+            service->reloadConfig(SEGMENT_CONFIG);
+
+            menuQueue = RebootMenu;
+            screen->runNow();
+        }
+    };
+    bannerOptions.InitialSelected = initialSelection;
+    screen->showOverlayBanner(bannerOptions);
+}
+
 void menuHandler::handleMenuSwitch(OLEDDisplay *display)
 {
     if (menuQueue != MenuNone)
         test_count = 0;
+    // Only update previousMenu if we're actually switching to a new menu
+    static screenMenus menuQueueLast = MenuNone;
+    if (menuQueue != menuQueueLast && menuQueue != MenuNone) {
+        previousMenu = menuQueueLast;
+        menuQueueLast = menuQueue;
+    }
     switch (menuQueue) {
     case MenuNone:
         break;
@@ -2781,6 +2869,9 @@ void menuHandler::handleMenuSwitch(OLEDDisplay *display)
         break;
     case MessageBubblesMenu:
         messageBubblesMenu();
+        break;
+    case TimeoutPicker:
+        timeoutPicker();
         break;
     }
     menuQueue = MenuNone;

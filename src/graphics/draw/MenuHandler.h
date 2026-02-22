@@ -56,7 +56,8 @@ class menuHandler
         FrameToggles,
         DisplayUnits,
         MessageBubblesMenu,
-        TimeoutPicker
+        TimeoutPicker,
+        PowerSavingMenu
     };
     static screenMenus menuQueue;
     static screenMenus previousMenu;
@@ -114,6 +115,7 @@ class menuHandler
     static void messageBubblesMenu();
     static void textMessageMenu();
     static void timeoutPicker();
+    static void powerSavingMenu();
 
   private:
     static void saveUIConfig();

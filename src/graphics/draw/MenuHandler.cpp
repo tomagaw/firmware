@@ -1065,11 +1065,7 @@ void menuHandler::systemBaseMenu()
     optionsEnumArray[options++] = WiFiToggle;
 #endif
 
-    if (currentResolution == ScreenResolution::UltraLow) {
-        optionsArray[options] = "Power";
-    } else {
-        optionsArray[options] = "Reboot/Shutdown";
-    }
+    optionsArray[options] = "Power";
     optionsEnumArray[options++] = PowerMenu;
 
     if (test_enabled) {
@@ -2370,7 +2366,7 @@ void menuHandler::screenOptionsMenu()
 void menuHandler::powerMenu()
 {
 
-    enum optionsNumbers { Back, Reboot, Shutdown, MUI };
+    enum optionsNumbers { Back, Reboot, Shutdown, PowerSaving, MUI };
     static const char *optionsArray[4] = {"Back"};
     static int optionsEnumArray[4] = {Back};
     int options = 1;
@@ -2381,16 +2377,19 @@ void menuHandler::powerMenu()
     optionsArray[options] = "Shutdown";
     optionsEnumArray[options++] = Shutdown;
 
+    optionsArray[options] = "Power saving";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Pwr Save";
+    }
+    optionsEnumArray[options++] = PowerSaving;
+
 #if HAS_TFT
     optionsArray[options] = "Switch to MUI";
     optionsEnumArray[options++] = MUI;
 #endif
 
     BannerOverlayOptions bannerOptions;
-    bannerOptions.message = "Reboot / Shutdown";
-    if (currentResolution == ScreenResolution::UltraLow) {
-        bannerOptions.message = "Power";
-    }
+    bannerOptions.message = "Power";
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = options;
     bannerOptions.optionsEnumPtr = optionsEnumArray;
@@ -2400,6 +2399,9 @@ void menuHandler::powerMenu()
             screen->runNow();
         } else if (selected == Shutdown) {
             menuHandler::menuQueue = menuHandler::ShutdownMenu;
+            screen->runNow();
+        } else if (selected == PowerSaving) {
+            menuHandler::menuQueue = menuHandler::PowerSavingMenu;
             screen->runNow();
         } else if (selected == MUI) {
             menuHandler::menuQueue = menuHandler::MuiPicker;
@@ -2648,29 +2650,28 @@ void menuHandler::timeoutPicker()
     static const char *optionsArray[] = {"Back",       "15 seconds", "30 seconds", "1 minute", "5 minutes",
                                          "10 minutes", "15 minutes", "30 minutes", "1 hour",   "Always On"};
 
-    // Get current timeout to set initial selection
-    int8_t initialSelection = 1; // Default to 15 seconds
-    if (config.display.screen_on_secs >= INT32_MAX) {
-        initialSelection = 9; // Always On
-    } else if (config.display.screen_on_secs >= 60 * 60) {
-        initialSelection = 8; // 1 hour
-    } else if (config.display.screen_on_secs >= 30 * 60) {
-        initialSelection = 7; // 30 minutes
-    } else if (config.display.screen_on_secs >= 15 * 60) {
-        initialSelection = 6; // 15 minutes
-    } else if (config.display.screen_on_secs >= 10 * 60) {
-        initialSelection = 5; // 10 minutes
-    } else if (config.display.screen_on_secs >= 5 * 60) {
-        initialSelection = 4; // 5 minutes
-    } else if (config.display.screen_on_secs >= 60) {
-        initialSelection = 3; // 1 minute
-    } else if (config.display.screen_on_secs >= 30) {
-        initialSelection = 2; // 30 seconds
-    } else if (config.display.screen_on_secs >= 15) {
-        initialSelection = 1; // 15 seconds
-    }
-
     BannerOverlayOptions bannerOptions;
+    // Get current timeout to set initial selection
+    bannerOptions.InitialSelected = 1; // Default to 15 seconds
+    if (config.display.screen_on_secs >= INT32_MAX) {
+        bannerOptions.InitialSelected = 9; // Always On
+    } else if (config.display.screen_on_secs >= 60 * 60) {
+        bannerOptions.InitialSelected = 8; // 1 hour
+    } else if (config.display.screen_on_secs >= 30 * 60) {
+        bannerOptions.InitialSelected = 7; // 30 minutes
+    } else if (config.display.screen_on_secs >= 15 * 60) {
+        bannerOptions.InitialSelected = 6; // 15 minutes
+    } else if (config.display.screen_on_secs >= 10 * 60) {
+        bannerOptions.InitialSelected = 5; // 10 minutes
+    } else if (config.display.screen_on_secs >= 5 * 60) {
+        bannerOptions.InitialSelected = 4; // 5 minutes
+    } else if (config.display.screen_on_secs >= 60) {
+        bannerOptions.InitialSelected = 3; // 1 minute
+    } else if (config.display.screen_on_secs >= 30) {
+        bannerOptions.InitialSelected = 2; // 30 seconds
+    } else if (config.display.screen_on_secs >= 15) {
+        bannerOptions.InitialSelected = 1; // 15 seconds
+    }
     bannerOptions.message = "Display Timeout";
     if (currentResolution == ScreenResolution::UltraLow) {
         bannerOptions.message = "Timeout";
@@ -2710,7 +2711,45 @@ void menuHandler::timeoutPicker()
             screen->runNow();
         }
     };
-    bannerOptions.InitialSelected = initialSelection;
+    screen->showOverlayBanner(bannerOptions);
+}
+
+void menuHandler::powerSavingMenu()
+{
+    enum optionsNumbers { Back, EnablePowerSaving, DisablePowerSaving };
+
+    static const char *optionsArray[] = {"Back", "Enabled", "Disabled"};
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Power Saving";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Pwr Save";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = 3;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.power.is_power_saving) {
+        bannerOptions.InitialSelected = 1; // Enabled
+    } else {
+        bannerOptions.InitialSelected = 2; // Disabled
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == EnablePowerSaving) {
+            config.power.is_power_saving = true;
+            LOG_INFO("Power saving enabled");
+        } else if (selected == DisablePowerSaving) {
+            config.power.is_power_saving = false;
+            LOG_INFO("Power saving disabled");
+        } else {
+            menuQueue = PowerMenu;
+            screen->runNow();
+        }
+
+        if (selected != 0) { // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+            menuQueue = RebootMenu;
+            screen->runNow();
+        }
+    };
     screen->showOverlayBanner(bannerOptions);
 }
 
@@ -2872,6 +2911,9 @@ void menuHandler::handleMenuSwitch(OLEDDisplay *display)
         break;
     case TimeoutPicker:
         timeoutPicker();
+        break;
+    case PowerSavingMenu:
+        powerSavingMenu();
         break;
     }
     menuQueue = MenuNone;

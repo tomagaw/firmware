@@ -2301,7 +2301,17 @@ void menuHandler::screenOptionsMenu()
     bool hasSupportBrightness = false;
 #endif
 
-    enum optionsNumbers { Back, Brightness, BoldHeadingMenu, Timeout, ScreenColor, FrameToggles, DisplayUnits, MessageBubbles };
+    enum optionsNumbers {
+        Back,
+        Brightness,
+        BoldHeadingMenu,
+        Timeout,
+        FlipScreen,
+        ScreenColor,
+        FrameToggles,
+        DisplayUnits,
+        MessageBubbles
+    };
     static const char *optionsArray[7] = {"Back"};
     static int optionsEnumArray[7] = {Back};
     int options = 1;
@@ -2317,6 +2327,12 @@ void menuHandler::screenOptionsMenu()
 
     optionsArray[options] = "Timeout";
     optionsEnumArray[options++] = Timeout;
+
+    optionsArray[options] = "Flip Screen";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Flip";
+    }
+    optionsEnumArray[options++] = FlipScreen;
 
     // Only show screen color for TFT displays
 #if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
@@ -2348,6 +2364,9 @@ void menuHandler::screenOptionsMenu()
             screen->runNow();
         } else if (selected == Timeout) {
             menuHandler::menuQueue = menuHandler::TimeoutPicker;
+            screen->runNow();
+        } else if (selected == FlipScreen) {
+            menuHandler::menuQueue = menuHandler::FlipScreenMenu;
             screen->runNow();
         } else if (selected == ScreenColor) {
             menuHandler::menuQueue = menuHandler::TftColorMenuPicker;
@@ -2810,6 +2829,54 @@ void menuHandler::boldHeadingMenu()
     screen->showOverlayBanner(bannerOptions);
 }
 
+void menuHandler::flipScreenMenu()
+{
+    enum optionsNumbers { Back, EnableFlipScreen, DisableFlipScreen, enumEnd };
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
+    int options = 1;
+
+    optionsArray[options] = "Enabled";
+    optionsEnumArray[options++] = EnableFlipScreen;
+
+    optionsArray[options] = "Disabled";
+    optionsEnumArray[options++] = DisableFlipScreen;
+
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Flip Screen";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Flip";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = options;
+    bannerOptions.optionsEnumPtr = optionsEnumArray;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.display.flip_screen) {
+        bannerOptions.InitialSelected = 1; // Enabled
+    } else {
+        bannerOptions.InitialSelected = 2; // Disabled
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == EnableFlipScreen) {
+            config.display.flip_screen = true;
+            LOG_INFO("Flip screen enabled");
+        } else if (selected == DisableFlipScreen) {
+            config.display.flip_screen = false;
+            LOG_INFO("Flip screen disabled");
+        } else { // Back
+            menuQueue = ScreenOptionsMenu;
+        }
+
+        if (selected != 0) { // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+            menuQueue = RebootMenu;
+        }
+
+        screen->runNow();
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
 void menuHandler::handleMenuSwitch(OLEDDisplay *display)
 {
     if (menuQueue != MenuNone)
@@ -2974,6 +3041,9 @@ void menuHandler::handleMenuSwitch(OLEDDisplay *display)
         break;
     case BoldHeadingMenu:
         boldHeadingMenu();
+        break;
+    case FlipScreenMenu:
+        flipScreenMenu();
         break;
     }
     menuQueue = MenuNone;

@@ -58,7 +58,8 @@ class menuHandler
         MessageBubblesMenu,
         TimeoutPicker,
         PowerSavingMenu,
-        BoldHeadingMenu
+        BoldHeadingMenu,
+        FlipScreenMenu
     };
     static screenMenus menuQueue;
     static screenMenus previousMenu;
@@ -118,6 +119,7 @@ class menuHandler
     static void timeoutPicker();
     static void powerSavingMenu();
     static void boldHeadingMenu();
+    static void flipScreenMenu();
 
   private:
     static void saveUIConfig();

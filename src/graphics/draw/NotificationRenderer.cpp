@@ -203,6 +203,11 @@ void NotificationRenderer::drawNumberPicker(OLEDDisplay *display, OLEDDisplayUiS
         resetBanner();
         return;
     }
+    // Clamp curSelected to valid range
+    if (curSelected < 0 || curSelected > static_cast<int8_t>(numDigits)) {
+        curSelected = 0;
+    }
+
     if (curSelected == static_cast<int8_t>(numDigits)) {
         alertBannerCallback(currentNumber);
         resetBanner();

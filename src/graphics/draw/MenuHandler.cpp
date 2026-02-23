@@ -2301,7 +2301,7 @@ void menuHandler::screenOptionsMenu()
     bool hasSupportBrightness = false;
 #endif
 
-    enum optionsNumbers { Back, Brightness, Timeout, ScreenColor, FrameToggles, DisplayUnits, MessageBubbles };
+    enum optionsNumbers { Back, Brightness, BoldHeadingMenu, Timeout, ScreenColor, FrameToggles, DisplayUnits, MessageBubbles };
     static const char *optionsArray[7] = {"Back"};
     static int optionsEnumArray[7] = {Back};
     int options = 1;
@@ -2311,6 +2311,9 @@ void menuHandler::screenOptionsMenu()
         optionsArray[options] = "Brightness";
         optionsEnumArray[options++] = Brightness;
     }
+
+    optionsArray[options] = "Bold Heading";
+    optionsEnumArray[options++] = BoldHeadingMenu;
 
     optionsArray[options] = "Timeout";
     optionsEnumArray[options++] = Timeout;
@@ -2339,6 +2342,9 @@ void menuHandler::screenOptionsMenu()
     bannerOptions.bannerCallback = [](int selected) -> void {
         if (selected == Brightness) {
             menuHandler::menuQueue = menuHandler::BrightnessPicker;
+            screen->runNow();
+        } else if (selected == BoldHeadingMenu) {
+            menuHandler::menuQueue = menuHandler::BoldHeadingMenu;
             screen->runNow();
         } else if (selected == Timeout) {
             menuHandler::menuQueue = menuHandler::TimeoutPicker;
@@ -2753,6 +2759,57 @@ void menuHandler::powerSavingMenu()
     screen->showOverlayBanner(bannerOptions);
 }
 
+void menuHandler::boldHeadingMenu()
+{
+    enum optionsNumbers { Back, EnableBoldHeading, DisableBoldHeading, enumEnd };
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
+    int options = 1;
+
+    optionsArray[options] = "Enabled";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Bold";
+    }
+    optionsEnumArray[options++] = EnableBoldHeading;
+
+    optionsArray[options] = "Disabled";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Normal";
+    }
+    optionsEnumArray[options++] = DisableBoldHeading;
+
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Bold Heading";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Heading";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = options;
+    bannerOptions.optionsEnumPtr = optionsEnumArray;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.display.heading_bold) {
+        bannerOptions.InitialSelected = 1; // Enabled
+    } else {
+        bannerOptions.InitialSelected = 2; // Disabled
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == EnableBoldHeading) {
+            config.display.heading_bold = true;
+            LOG_INFO("Bold heading enabled");
+        } else if (selected == DisableBoldHeading) {
+            config.display.heading_bold = false;
+            LOG_INFO("Bold heading disabled");
+        }
+
+        if (selected != 0) // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+
+        menuQueue = ScreenOptionsMenu;
+        screen->runNow();
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
 void menuHandler::handleMenuSwitch(OLEDDisplay *display)
 {
     if (menuQueue != MenuNone)
@@ -2914,6 +2971,9 @@ void menuHandler::handleMenuSwitch(OLEDDisplay *display)
         break;
     case PowerSavingMenu:
         powerSavingMenu();
+        break;
+    case BoldHeadingMenu:
+        boldHeadingMenu();
         break;
     }
     menuQueue = MenuNone;

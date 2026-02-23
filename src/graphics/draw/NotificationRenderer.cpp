@@ -279,9 +279,9 @@ void NotificationRenderer::drawNodePicker(OLEDDisplay *display, OLEDDisplayUiSta
         return;
     }
 
-    if (curSelected == -1)
+    if (curSelected <= -1)
         curSelected = alertBannerOptions - 1;
-    if (curSelected == alertBannerOptions)
+    if (curSelected >= alertBannerOptions)
         curSelected = 0;
 
     inEvent.inputEvent = INPUT_BROKER_NONE;
@@ -401,9 +401,9 @@ void NotificationRenderer::drawAlertBannerOverlay(OLEDDisplay *display, OLEDDisp
             return;
         }
 
-        if (curSelected == -1)
+        if (curSelected <= -1)
             curSelected = alertBannerOptions - 1;
-        if (curSelected == alertBannerOptions)
+        if (curSelected >= alertBannerOptions)
             curSelected = 0;
     } else {
         if (inEvent.inputEvent == INPUT_BROKER_SELECT || inEvent.inputEvent == INPUT_BROKER_ALT_LONG ||

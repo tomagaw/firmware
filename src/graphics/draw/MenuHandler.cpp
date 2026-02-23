@@ -230,6 +230,16 @@ void menuHandler::deviceRolePicker()
         devicerole_lostandfound = 3,
         devicerole_tracker = 4
     };
+    int currentSelection = 0;
+    if (config.device.role == meshtastic_Config_DeviceConfig_Role_CLIENT) {
+        currentSelection = devicerole_client;
+    } else if (config.device.role == meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE) {
+        currentSelection = devicerole_clientmute;
+    } else if (config.device.role == meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND) {
+        currentSelection = devicerole_lostandfound;
+    } else if (config.device.role == meshtastic_Config_DeviceConfig_Role_TRACKER) {
+        currentSelection = devicerole_tracker;
+    }
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Device Role";
     bannerOptions.optionsArrayPtr = optionsArray;
@@ -251,6 +261,7 @@ void menuHandler::deviceRolePicker()
         service->reloadConfig(SEGMENT_CONFIG);
         rebootAtMsec = (millis() + DEFAULT_REBOOT_SECONDS * 1000);
     };
+    bannerOptions.InitialSelected = currentSelection;
     screen->showOverlayBanner(bannerOptions);
 }
 

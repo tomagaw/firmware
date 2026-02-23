@@ -59,6 +59,10 @@ BannerOverlayOptions createStaticBannerOptions(const char *message, const MenuOp
 } // namespace
 
 menuHandler::screenMenus menuHandler::menuQueue = MenuNone;
+/* Stores previous value of menuQueue
+ * Note: Use only for "Back" from last menu in a menu stack (e.g. RebootMenu)
+ */
+menuHandler::screenMenus menuHandler::previousMenu = MenuNone;
 uint32_t menuHandler::pickedNodeNum = 0;
 bool test_enabled = false;
 uint8_t test_count = 0;
@@ -1061,11 +1065,7 @@ void menuHandler::systemBaseMenu()
     optionsEnumArray[options++] = WiFiToggle;
 #endif
 
-    if (currentResolution == ScreenResolution::UltraLow) {
-        optionsArray[options] = "Power";
-    } else {
-        optionsArray[options] = "Reboot/Shutdown";
-    }
+    optionsArray[options] = "Power";
     optionsEnumArray[options++] = PowerMenu;
 
     if (test_enabled) {
@@ -2139,7 +2139,7 @@ void menuHandler::rebootMenu()
             messageStore.saveToFlash();
             rebootAtMsec = millis() + DEFAULT_REBOOT_SECONDS * 1000;
         } else {
-            menuQueue = PowerMenu;
+            menuQueue = previousMenu; // Return to previous menu instead of a fixed menu
             screen->runNow();
         }
     };
@@ -2301,9 +2301,21 @@ void menuHandler::screenOptionsMenu()
     bool hasSupportBrightness = false;
 #endif
 
-    enum optionsNumbers { Back, Brightness, ScreenColor, FrameToggles, DisplayUnits, MessageBubbles };
-    static const char *optionsArray[6] = {"Back"};
-    static int optionsEnumArray[6] = {Back};
+    enum optionsNumbers {
+        Back,
+        Brightness,
+        BoldHeading,
+        Timeout,
+        FlipScreen,
+        DisplayMode,
+        ScreenColor,
+        FrameToggles,
+        DisplayUnits,
+        MessageBubbles,
+        enumEnd
+    };
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
     int options = 1;
 
     // Only show brightness for B&W displays
@@ -2311,6 +2323,24 @@ void menuHandler::screenOptionsMenu()
         optionsArray[options] = "Brightness";
         optionsEnumArray[options++] = Brightness;
     }
+
+    optionsArray[options] = "Bold Heading";
+    optionsEnumArray[options++] = BoldHeading;
+
+    optionsArray[options] = "Timeout";
+    optionsEnumArray[options++] = Timeout;
+
+    optionsArray[options] = "Flip Screen";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Flip";
+    }
+    optionsEnumArray[options++] = FlipScreen;
+
+    optionsArray[options] = "Display Mode";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Mode";
+    }
+    optionsEnumArray[options++] = DisplayMode;
 
     // Only show screen color for TFT displays
 #if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
@@ -2336,23 +2366,26 @@ void menuHandler::screenOptionsMenu()
     bannerOptions.bannerCallback = [](int selected) -> void {
         if (selected == Brightness) {
             menuHandler::menuQueue = menuHandler::BrightnessPicker;
-            screen->runNow();
+        } else if (selected == BoldHeading) {
+            menuHandler::menuQueue = menuHandler::BoldHeadingMenu;
+        } else if (selected == Timeout) {
+            menuHandler::menuQueue = menuHandler::TimeoutPicker;
+        } else if (selected == FlipScreen) {
+            menuHandler::menuQueue = menuHandler::FlipScreenMenu;
+        } else if (selected == DisplayMode) {
+            menuHandler::menuQueue = menuHandler::DisplayModeMenu;
         } else if (selected == ScreenColor) {
             menuHandler::menuQueue = menuHandler::TftColorMenuPicker;
-            screen->runNow();
         } else if (selected == FrameToggles) {
             menuHandler::menuQueue = menuHandler::FrameToggles;
-            screen->runNow();
         } else if (selected == DisplayUnits) {
             menuHandler::menuQueue = menuHandler::DisplayUnits;
-            screen->runNow();
         } else if (selected == MessageBubbles) {
             menuHandler::menuQueue = menuHandler::MessageBubblesMenu;
-            screen->runNow();
         } else {
             menuQueue = SystemBaseMenu;
-            screen->runNow();
         }
+        screen->runNow();
     };
     screen->showOverlayBanner(bannerOptions);
 }
@@ -2360,7 +2393,7 @@ void menuHandler::screenOptionsMenu()
 void menuHandler::powerMenu()
 {
 
-    enum optionsNumbers { Back, Reboot, Shutdown, MUI };
+    enum optionsNumbers { Back, Reboot, Shutdown, PowerSaving, MUI };
     static const char *optionsArray[4] = {"Back"};
     static int optionsEnumArray[4] = {Back};
     int options = 1;
@@ -2371,16 +2404,19 @@ void menuHandler::powerMenu()
     optionsArray[options] = "Shutdown";
     optionsEnumArray[options++] = Shutdown;
 
+    optionsArray[options] = "Power saving";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Pwr Save";
+    }
+    optionsEnumArray[options++] = PowerSaving;
+
 #if HAS_TFT
     optionsArray[options] = "Switch to MUI";
     optionsEnumArray[options++] = MUI;
 #endif
 
     BannerOverlayOptions bannerOptions;
-    bannerOptions.message = "Reboot / Shutdown";
-    if (currentResolution == ScreenResolution::UltraLow) {
-        bannerOptions.message = "Power";
-    }
+    bannerOptions.message = "Power";
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = options;
     bannerOptions.optionsEnumPtr = optionsEnumArray;
@@ -2390,6 +2426,9 @@ void menuHandler::powerMenu()
             screen->runNow();
         } else if (selected == Shutdown) {
             menuHandler::menuQueue = menuHandler::ShutdownMenu;
+            screen->runNow();
+        } else if (selected == PowerSaving) {
+            menuHandler::menuQueue = menuHandler::PowerSavingMenu;
             screen->runNow();
         } else if (selected == MUI) {
             menuHandler::menuQueue = menuHandler::MuiPicker;
@@ -2632,10 +2671,289 @@ void menuHandler::messageBubblesMenu()
     screen->showOverlayBanner(bannerOptions);
 }
 
+void menuHandler::timeoutPicker()
+{
+    // Same values as Meshtastic App for consistency
+    static const char *optionsArray[] = {"Back",       "15 seconds", "30 seconds", "1 minute", "5 minutes",
+                                         "10 minutes", "15 minutes", "30 minutes", "1 hour",   "Always On"};
+
+    BannerOverlayOptions bannerOptions;
+    // Get current timeout to set initial selection
+    bannerOptions.InitialSelected = 1; // Default to 15 seconds
+    if (config.display.screen_on_secs >= INT32_MAX) {
+        bannerOptions.InitialSelected = 9; // Always On
+    } else if (config.display.screen_on_secs >= 60 * 60) {
+        bannerOptions.InitialSelected = 8; // 1 hour
+    } else if (config.display.screen_on_secs >= 30 * 60) {
+        bannerOptions.InitialSelected = 7; // 30 minutes
+    } else if (config.display.screen_on_secs >= 15 * 60) {
+        bannerOptions.InitialSelected = 6; // 15 minutes
+    } else if (config.display.screen_on_secs >= 10 * 60) {
+        bannerOptions.InitialSelected = 5; // 10 minutes
+    } else if (config.display.screen_on_secs >= 5 * 60) {
+        bannerOptions.InitialSelected = 4; // 5 minutes
+    } else if (config.display.screen_on_secs >= 60) {
+        bannerOptions.InitialSelected = 3; // 1 minute
+    } else if (config.display.screen_on_secs >= 30) {
+        bannerOptions.InitialSelected = 2; // 30 seconds
+    } else if (config.display.screen_on_secs >= 15) {
+        bannerOptions.InitialSelected = 1; // 15 seconds
+    }
+    bannerOptions.message = "Display Timeout";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Timeout";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = 10;
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == 1) { // 15 seconds
+            config.display.screen_on_secs = 15;
+        } else if (selected == 2) { // 30 seconds
+            config.display.screen_on_secs = 30;
+        } else if (selected == 3) { // 1 minute
+            config.display.screen_on_secs = 60;
+        } else if (selected == 4) { // 5 minutes
+            config.display.screen_on_secs = 5 * 60;
+        } else if (selected == 5) { // 10 minutes
+            config.display.screen_on_secs = 10 * 60;
+        } else if (selected == 6) { // 15 minutes
+            config.display.screen_on_secs = 15 * 60;
+        } else if (selected == 7) { // 30 minutes
+            config.display.screen_on_secs = 30 * 60;
+        } else if (selected == 8) { // 1 hour
+            config.display.screen_on_secs = 60 * 60;
+        } else if (selected == 9) { // Always On
+            config.display.screen_on_secs = INT32_MAX;
+        } else { // Back
+            menuQueue = ScreenOptionsMenu;
+            screen->runNow();
+        }
+
+        if (selected != 0) { // Not "Back"
+            LOG_INFO("Display timeout set to %d seconds", config.display.screen_on_secs);
+            saveUIConfig();
+            service->reloadConfig(SEGMENT_CONFIG);
+
+            menuQueue = RebootMenu;
+            screen->runNow();
+        }
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
+void menuHandler::powerSavingMenu()
+{
+    enum optionsNumbers { Back, EnablePowerSaving, DisablePowerSaving };
+
+    static const char *optionsArray[] = {"Back", "Enabled", "Disabled"};
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Power Saving";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Pwr Save";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = 3;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.power.is_power_saving) {
+        bannerOptions.InitialSelected = 1; // Enabled
+    } else {
+        bannerOptions.InitialSelected = 2; // Disabled
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == EnablePowerSaving) {
+            config.power.is_power_saving = true;
+            LOG_INFO("Power saving enabled");
+        } else if (selected == DisablePowerSaving) {
+            config.power.is_power_saving = false;
+            LOG_INFO("Power saving disabled");
+        } else {
+            menuQueue = PowerMenu;
+            screen->runNow();
+        }
+
+        if (selected != 0) { // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+            menuQueue = RebootMenu;
+            screen->runNow();
+        }
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
+void menuHandler::boldHeadingMenu()
+{
+    enum optionsNumbers { Back, EnableBoldHeading, DisableBoldHeading, enumEnd };
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
+    int options = 1;
+
+    optionsArray[options] = "Enabled";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Bold";
+    }
+    optionsEnumArray[options++] = EnableBoldHeading;
+
+    optionsArray[options] = "Disabled";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Normal";
+    }
+    optionsEnumArray[options++] = DisableBoldHeading;
+
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Bold Heading";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Heading";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = options;
+    bannerOptions.optionsEnumPtr = optionsEnumArray;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.display.heading_bold) {
+        bannerOptions.InitialSelected = 1; // Enabled
+    } else {
+        bannerOptions.InitialSelected = 2; // Disabled
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == EnableBoldHeading) {
+            config.display.heading_bold = true;
+            LOG_INFO("Bold heading enabled");
+        } else if (selected == DisableBoldHeading) {
+            config.display.heading_bold = false;
+            LOG_INFO("Bold heading disabled");
+        }
+
+        if (selected != 0) // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+
+        menuQueue = ScreenOptionsMenu;
+        screen->runNow();
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
+void menuHandler::flipScreenMenu()
+{
+    enum optionsNumbers { Back, EnableFlipScreen, DisableFlipScreen, enumEnd };
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
+    int options = 1;
+
+    optionsArray[options] = "Enabled";
+    optionsEnumArray[options++] = EnableFlipScreen;
+
+    optionsArray[options] = "Disabled";
+    optionsEnumArray[options++] = DisableFlipScreen;
+
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Flip Screen";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Flip";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = options;
+    bannerOptions.optionsEnumPtr = optionsEnumArray;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.display.flip_screen) {
+        bannerOptions.InitialSelected = 1; // Enabled
+    } else {
+        bannerOptions.InitialSelected = 2; // Disabled
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == EnableFlipScreen) {
+            config.display.flip_screen = true;
+            LOG_INFO("Flip screen enabled");
+        } else if (selected == DisableFlipScreen) {
+            config.display.flip_screen = false;
+            LOG_INFO("Flip screen disabled");
+        } else { // Back
+            menuQueue = ScreenOptionsMenu;
+        }
+
+        if (selected != 0) { // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+            menuQueue = RebootMenu;
+        }
+
+        screen->runNow();
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
+void menuHandler::displayModeMenu()
+{
+    enum optionsNumbers { Back, Default, TwoColor, Inverted, Color, enumEnd };
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
+    int options = 1;
+
+    optionsArray[options] = "Default";
+    optionsEnumArray[options++] = Default;
+
+    optionsArray[options] = "Two-Color";
+    optionsEnumArray[options++] = TwoColor;
+
+    optionsArray[options] = "Inverted";
+    optionsEnumArray[options++] = Inverted;
+
+#if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
+    HAS_TFT || defined(HACKADAY_COMMUNICATOR)
+    optionsArray[options] = "Color";
+    optionsEnumArray[options++] = Color;
+#endif
+
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Display Mode";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Mode";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = options;
+    bannerOptions.optionsEnumPtr = optionsEnumArray;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_DEFAULT) {
+        bannerOptions.InitialSelected = Default;
+    } else if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_TWOCOLOR) {
+        bannerOptions.InitialSelected = TwoColor;
+    } else if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_INVERTED) {
+        bannerOptions.InitialSelected = Inverted;
+    } else if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+        bannerOptions.InitialSelected = Color;
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == Default) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_DEFAULT;
+            LOG_INFO("Display mode set to DEFAULT");
+        } else if (selected == TwoColor) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_TWOCOLOR;
+            LOG_INFO("Display mode set to TWOCOLOR");
+        } else if (selected == Inverted) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_INVERTED;
+            LOG_INFO("Display mode set to INVERTED");
+        } else if (selected == Color) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_COLOR;
+            LOG_INFO("Display mode set to TWOCOLOR");
+        }
+
+        if (selected != 0) { // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+        }
+
+        menuQueue = ScreenOptionsMenu;
+        screen->runNow();
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
 void menuHandler::handleMenuSwitch(OLEDDisplay *display)
 {
     if (menuQueue != MenuNone)
         test_count = 0;
+    // Only update previousMenu if we're actually switching to a new menu
+    static screenMenus menuQueueLast = MenuNone;
+    if (menuQueue != menuQueueLast && menuQueue != MenuNone) {
+        previousMenu = menuQueueLast;
+        menuQueueLast = menuQueue;
+    }
     switch (menuQueue) {
     case MenuNone:
         break;
@@ -2781,6 +3099,21 @@ void menuHandler::handleMenuSwitch(OLEDDisplay *display)
         break;
     case MessageBubblesMenu:
         messageBubblesMenu();
+        break;
+    case TimeoutPicker:
+        timeoutPicker();
+        break;
+    case PowerSavingMenu:
+        powerSavingMenu();
+        break;
+    case BoldHeadingMenu:
+        boldHeadingMenu();
+        break;
+    case FlipScreenMenu:
+        flipScreenMenu();
+        break;
+    case DisplayModeMenu:
+        displayModeMenu();
         break;
     }
     menuQueue = MenuNone;

@@ -334,6 +334,25 @@ void menuHandler::radioPresetPicker()
     constexpr size_t presetCount = sizeof(presetOptions) / sizeof(presetOptions[0]);
     static std::array<const char *, presetCount> presetLabels{};
 
+    int curentSelection = 0; // Default to Back
+    if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_LONG_TURBO) {
+        curentSelection = 1;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_LONG_MODERATE) {
+        curentSelection = 2;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_LONG_FAST) {
+        curentSelection = 3;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_MEDIUM_SLOW) {
+        curentSelection = 4;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_MEDIUM_FAST) {
+        curentSelection = 5;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_SHORT_SLOW) {
+        curentSelection = 6;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_SHORT_FAST) {
+        curentSelection = 7;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_SHORT_TURBO) {
+        curentSelection = 8;
+    }
+
     auto bannerOptions =
         createStaticBannerOptions("Radio Preset", presetOptions, presetLabels, [](const RadioPresetOption &option, int) -> void {
             if (option.action == OptionsAction::Back) {
@@ -352,7 +371,7 @@ void menuHandler::radioPresetPicker()
             service->reloadConfig(SEGMENT_CONFIG);
             rebootAtMsec = (millis() + DEFAULT_REBOOT_SECONDS * 1000);
         });
-
+    bannerOptions.InitialSelected = curentSelection;
     screen->showOverlayBanner(bannerOptions);
 }
 

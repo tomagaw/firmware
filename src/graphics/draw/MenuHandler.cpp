@@ -2304,16 +2304,18 @@ void menuHandler::screenOptionsMenu()
     enum optionsNumbers {
         Back,
         Brightness,
-        BoldHeadingMenu,
+        BoldHeading,
         Timeout,
         FlipScreen,
+        DisplayMode,
         ScreenColor,
         FrameToggles,
         DisplayUnits,
-        MessageBubbles
+        MessageBubbles,
+        enumEnd
     };
-    static const char *optionsArray[7] = {"Back"};
-    static int optionsEnumArray[7] = {Back};
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
     int options = 1;
 
     // Only show brightness for B&W displays
@@ -2323,7 +2325,7 @@ void menuHandler::screenOptionsMenu()
     }
 
     optionsArray[options] = "Bold Heading";
-    optionsEnumArray[options++] = BoldHeadingMenu;
+    optionsEnumArray[options++] = BoldHeading;
 
     optionsArray[options] = "Timeout";
     optionsEnumArray[options++] = Timeout;
@@ -2333,6 +2335,12 @@ void menuHandler::screenOptionsMenu()
         optionsArray[options] = "Flip";
     }
     optionsEnumArray[options++] = FlipScreen;
+
+    optionsArray[options] = "Display Mode";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        optionsArray[options] = "Mode";
+    }
+    optionsEnumArray[options++] = DisplayMode;
 
     // Only show screen color for TFT displays
 #if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
@@ -2358,32 +2366,26 @@ void menuHandler::screenOptionsMenu()
     bannerOptions.bannerCallback = [](int selected) -> void {
         if (selected == Brightness) {
             menuHandler::menuQueue = menuHandler::BrightnessPicker;
-            screen->runNow();
-        } else if (selected == BoldHeadingMenu) {
+        } else if (selected == BoldHeading) {
             menuHandler::menuQueue = menuHandler::BoldHeadingMenu;
-            screen->runNow();
         } else if (selected == Timeout) {
             menuHandler::menuQueue = menuHandler::TimeoutPicker;
-            screen->runNow();
         } else if (selected == FlipScreen) {
             menuHandler::menuQueue = menuHandler::FlipScreenMenu;
-            screen->runNow();
+        } else if (selected == DisplayMode) {
+            menuHandler::menuQueue = menuHandler::DisplayModeMenu;
         } else if (selected == ScreenColor) {
             menuHandler::menuQueue = menuHandler::TftColorMenuPicker;
-            screen->runNow();
         } else if (selected == FrameToggles) {
             menuHandler::menuQueue = menuHandler::FrameToggles;
-            screen->runNow();
         } else if (selected == DisplayUnits) {
             menuHandler::menuQueue = menuHandler::DisplayUnits;
-            screen->runNow();
         } else if (selected == MessageBubbles) {
             menuHandler::menuQueue = menuHandler::MessageBubblesMenu;
-            screen->runNow();
         } else {
             menuQueue = SystemBaseMenu;
-            screen->runNow();
         }
+        screen->runNow();
     };
     screen->showOverlayBanner(bannerOptions);
 }
@@ -2877,6 +2879,71 @@ void menuHandler::flipScreenMenu()
     screen->showOverlayBanner(bannerOptions);
 }
 
+void menuHandler::displayModeMenu()
+{
+    enum optionsNumbers { Back, Default, TwoColor, Inverted, Color, enumEnd };
+    static const char *optionsArray[enumEnd] = {"Back"};
+    static int optionsEnumArray[enumEnd] = {Back};
+    int options = 1;
+
+    optionsArray[options] = "Default";
+    optionsEnumArray[options++] = Default;
+
+    optionsArray[options] = "Two-Color";
+    optionsEnumArray[options++] = TwoColor;
+
+    optionsArray[options] = "Inverted";
+    optionsEnumArray[options++] = Inverted;
+
+#if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
+    HAS_TFT || defined(HACKADAY_COMMUNICATOR)
+    optionsArray[options] = "Color";
+    optionsEnumArray[options++] = Color;
+#endif
+
+    BannerOverlayOptions bannerOptions;
+    bannerOptions.message = "Display Mode";
+    if (currentResolution == ScreenResolution::UltraLow) {
+        bannerOptions.message = "Mode";
+    }
+    bannerOptions.optionsArrayPtr = optionsArray;
+    bannerOptions.optionsCount = options;
+    bannerOptions.optionsEnumPtr = optionsEnumArray;
+    bannerOptions.InitialSelected = 0; // Default to "Back"
+    if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_DEFAULT) {
+        bannerOptions.InitialSelected = Default;
+    } else if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_TWOCOLOR) {
+        bannerOptions.InitialSelected = TwoColor;
+    } else if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_INVERTED) {
+        bannerOptions.InitialSelected = Inverted;
+    } else if (config.display.displaymode == meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+        bannerOptions.InitialSelected = Color;
+    }
+    bannerOptions.bannerCallback = [](int selected) -> void {
+        if (selected == Default) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_DEFAULT;
+            LOG_INFO("Display mode set to DEFAULT");
+        } else if (selected == TwoColor) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_TWOCOLOR;
+            LOG_INFO("Display mode set to TWOCOLOR");
+        } else if (selected == Inverted) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_INVERTED;
+            LOG_INFO("Display mode set to INVERTED");
+        } else if (selected == Color) {
+            config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_COLOR;
+            LOG_INFO("Display mode set to TWOCOLOR");
+        }
+
+        if (selected != 0) { // Not "Back"
+            service->reloadConfig(SEGMENT_CONFIG);
+        }
+
+        menuQueue = ScreenOptionsMenu;
+        screen->runNow();
+    };
+    screen->showOverlayBanner(bannerOptions);
+}
+
 void menuHandler::handleMenuSwitch(OLEDDisplay *display)
 {
     if (menuQueue != MenuNone)
@@ -3044,6 +3111,9 @@ void menuHandler::handleMenuSwitch(OLEDDisplay *display)
         break;
     case FlipScreenMenu:
         flipScreenMenu();
+        break;
+    case DisplayModeMenu:
+        displayModeMenu();
         break;
     }
     menuQueue = MenuNone;

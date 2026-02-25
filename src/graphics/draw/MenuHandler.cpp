@@ -230,6 +230,16 @@ void menuHandler::deviceRolePicker()
         devicerole_lostandfound = 3,
         devicerole_tracker = 4
     };
+    int currentSelection = 0;
+    if (config.device.role == meshtastic_Config_DeviceConfig_Role_CLIENT) {
+        currentSelection = devicerole_client;
+    } else if (config.device.role == meshtastic_Config_DeviceConfig_Role_CLIENT_MUTE) {
+        currentSelection = devicerole_clientmute;
+    } else if (config.device.role == meshtastic_Config_DeviceConfig_Role_LOST_AND_FOUND) {
+        currentSelection = devicerole_lostandfound;
+    } else if (config.device.role == meshtastic_Config_DeviceConfig_Role_TRACKER) {
+        currentSelection = devicerole_tracker;
+    }
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Device Role";
     bannerOptions.optionsArrayPtr = optionsArray;
@@ -251,6 +261,7 @@ void menuHandler::deviceRolePicker()
         service->reloadConfig(SEGMENT_CONFIG);
         rebootAtMsec = (millis() + DEFAULT_REBOOT_SECONDS * 1000);
     };
+    bannerOptions.InitialSelected = currentSelection;
     screen->showOverlayBanner(bannerOptions);
 }
 
@@ -334,6 +345,25 @@ void menuHandler::radioPresetPicker()
     constexpr size_t presetCount = sizeof(presetOptions) / sizeof(presetOptions[0]);
     static std::array<const char *, presetCount> presetLabels{};
 
+    int curentSelection = 0; // Default to Back
+    if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_LONG_TURBO) {
+        curentSelection = 1;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_LONG_MODERATE) {
+        curentSelection = 2;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_LONG_FAST) {
+        curentSelection = 3;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_MEDIUM_SLOW) {
+        curentSelection = 4;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_MEDIUM_FAST) {
+        curentSelection = 5;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_SHORT_SLOW) {
+        curentSelection = 6;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_SHORT_FAST) {
+        curentSelection = 7;
+    } else if (config.lora.modem_preset == meshtastic_Config_LoRaConfig_ModemPreset_SHORT_TURBO) {
+        curentSelection = 8;
+    }
+
     auto bannerOptions =
         createStaticBannerOptions("Radio Preset", presetOptions, presetLabels, [](const RadioPresetOption &option, int) -> void {
             if (option.action == OptionsAction::Back) {
@@ -352,7 +382,7 @@ void menuHandler::radioPresetPicker()
             service->reloadConfig(SEGMENT_CONFIG);
             rebootAtMsec = (millis() + DEFAULT_REBOOT_SECONDS * 1000);
         });
-
+    bannerOptions.InitialSelected = curentSelection;
     screen->showOverlayBanner(bannerOptions);
 }
 

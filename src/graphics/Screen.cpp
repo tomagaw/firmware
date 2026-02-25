@@ -1652,10 +1652,29 @@ int Screen::handleInputEvent(const InputEvent *event)
         menuHandler::handleMenuSwitch(dispdev);
         return 0;
     }
+    // SELECT_LONG in scrollable frames to allow scrolling with rotary encoder
+    static bool scrollMode = false;
+    if (ui->getUiState()->currentFrame == framesetInfo.positions.textMessage ||
+        ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_nodes ||
+        ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_location ||
+        ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_lastheard ||
+        ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_hopsignal ||
+        ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_distance ||
+        ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_bearings) {
+        if (event->inputEvent == INPUT_BROKER_SELECT_LONG) {
+            scrollMode = !scrollMode;
+            screen->showSimpleBanner(scrollMode ? "Scroll Mode ON" : "Scroll Mode OFF", 1000);
+            return 0;
+        } else if (event->inputEvent != INPUT_BROKER_RIGHT && event->inputEvent != INPUT_BROKER_LEFT &&
+                   event->inputEvent != INPUT_BROKER_SELECT && scrollMode) {
+            scrollMode = false;
+            screen->showSimpleBanner(scrollMode ? "Scroll Mode ON" : "Scroll Mode OFF", 1000);
+        }
+    }
     // UP/DOWN in message screen scrolls through message threads
     if (ui->getUiState()->currentFrame == framesetInfo.positions.textMessage) {
 
-        if (event->inputEvent == INPUT_BROKER_UP) {
+        if (event->inputEvent == INPUT_BROKER_UP || (event->inputEvent == INPUT_BROKER_RIGHT && scrollMode)) {
             if (messageStore.getMessages().empty()) {
                 cannedMessageModule->LaunchWithDestination(NODENUM_BROADCAST);
             } else {
@@ -1665,7 +1684,7 @@ int Screen::handleInputEvent(const InputEvent *event)
             }
         }
 
-        if (event->inputEvent == INPUT_BROKER_DOWN) {
+        if (event->inputEvent == INPUT_BROKER_DOWN || (event->inputEvent == INPUT_BROKER_LEFT && scrollMode)) {
             if (messageStore.getMessages().empty()) {
                 cannedMessageModule->LaunchWithDestination(NODENUM_BROADCAST);
             } else {
@@ -1682,13 +1701,13 @@ int Screen::handleInputEvent(const InputEvent *event)
         ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_hopsignal ||
         ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_distance ||
         ui->getUiState()->currentFrame == framesetInfo.positions.nodelist_bearings) {
-        if (event->inputEvent == INPUT_BROKER_UP) {
+        if (event->inputEvent == INPUT_BROKER_UP || (event->inputEvent == INPUT_BROKER_RIGHT && scrollMode)) {
             graphics::NodeListRenderer::scrollUp();
             setFastFramerate();
             return 0;
         }
 
-        if (event->inputEvent == INPUT_BROKER_DOWN) {
+        if (event->inputEvent == INPUT_BROKER_DOWN || (event->inputEvent == INPUT_BROKER_LEFT && scrollMode)) {
             graphics::NodeListRenderer::scrollDown();
             setFastFramerate();
             return 0;

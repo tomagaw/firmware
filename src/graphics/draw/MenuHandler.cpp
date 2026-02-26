@@ -2961,7 +2961,7 @@ void menuHandler::displayModeMenu()
             LOG_INFO("Display mode set to INVERTED");
         } else if (selected == Color) {
             config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_COLOR;
-            LOG_INFO("Display mode set to TWOCOLOR");
+            LOG_INFO("Display mode set to COLOR");
         }
 
         if (selected != 0) { // Not "Back"
